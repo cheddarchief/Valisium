@@ -303,7 +303,7 @@ triangle_mesh_draw :: proc(using mesh: ^Triangle_Mesh($Index_Type)) {
 
 Shader_Program :: struct {
     id:                u32,
-    uniforms:          map[string]i32,
+    uniforms:          map[cstring]i32,
 
     last_changed_time: time.Time
 }
@@ -324,8 +324,8 @@ shader_program_load_from_path :: proc(
 
 shader_program_load_from_handle :: proc(
     using program: ^Shader_Program,
-    handle: os.Handle,
-    allocator := context.allocator
+    handle:         os.Handle,
+    allocator :=    context.allocator
 ) -> (ok: bool) {
     context.allocator = allocator
 
@@ -454,6 +454,21 @@ shader_program_load_from_handle :: proc(
     return
 }
 
+shader_program_init_uniforms :: proc(
+    using program: ^Shader_Program,
+    uniform_names: []cstring
+) -> (ok: bool) {
+    for i in 0..<len(uniform_names) {
+        name             := uniform_names[i]
+        uniform_location := gl.GetUniformLocation(id, name)
+
+        program.uniforms[name] = uniform_location
+    }
+    ok = true // TODO: add error handling
+
+    return
+}
+
 @(private)
 create_shader :: proc(
     source:     ^cstring,
@@ -464,7 +479,12 @@ create_shader :: proc(
     gl.ShaderSource(id, 1, source, nil)
     gl.CompileShader(id)
 
-    ok = check_for_gl_errors(id, gl.COMPILE_STATUS, gl.GetShaderiv, gl.GetShaderInfoLog)
+    ok = check_for_gl_errors(
+        id,
+        gl.COMPILE_STATUS,
+        gl.GetShaderiv,
+        gl.GetShaderInfoLog
+    )
 
     return
 }

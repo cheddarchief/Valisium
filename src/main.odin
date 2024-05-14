@@ -32,6 +32,7 @@ Window :: struct {
         x, y:   f32,
         dx, dy: f32,
         dirty:  bool,
+        locked: bool,
     },
 }
 
@@ -47,9 +48,10 @@ state: struct {
     flycam:         camera.Camera,
     move_direction: bit_set[camera.Direction; u32],
 
-    keys: [glfw.KEY_LAST]bool,
+    keys:  [glfw.KEY_LAST]bool,
+    mouse: [glfw.MOUSE_BUTTON_LAST]bool,
 
-    frame_duration: f32
+    frame_duration: f32,
 }
 
 init :: proc() -> (ok: bool) {
@@ -143,11 +145,20 @@ init :: proc() -> (ok: bool) {
         gfx.triangle_mesh_init_vao(&mesh, &mesh_layout)
 
         if ok = gfx.shader_program_load_from_path(
-            &program,
-            "./res/shaders/default.glsl"
-        ); !ok {
+                &program,
+                "w:/Valisium/res/shaders/default.glsl"
+            ); !ok {
             return
         }
+
+        if ok = gfx.shader_program_init_uniforms(
+                &program,
+                []cstring { "mvp" }
+            ); !ok {
+            return
+        }
+
+        log.info(program.uniforms)
     }
 
     // To move opengl context to another thread, unbind it here
@@ -168,15 +179,6 @@ cleanup :: proc() {
 
 update_camera_position_direction :: proc() {
     using state
-
-/*
-    move_direction[.Forward]  = state.keys[glfw.KEY_W]
-    move_direction[.Backward] = state.keys[glfw.KEY_S]
-    move_direction[.Right]    = state.keys[glfw.KEY_D]
-    move_direction[.Left]     = state.keys[glfw.KEY_A]
-    move_direction[.Up]       = state.keys[glfw.KEY_SPACE]
-    move_direction[.Down]     = state.keys[glfw.KEY_LEFT_SHIFT]
-*/
 
     if state.keys[glfw.KEY_W] {
         move_direction += {.Forward}
@@ -206,6 +208,25 @@ frame_flush :: proc() -> bool {
     if state.keys[glfw.KEY_Q] {
         window.open = false
     }
+
+    if state.mouse[glfw.MOUSE_BUTTON_RIGHT] {
+        window.cursor.locked = !window.cursor.locked
+
+        if window.cursor.locked {
+            glfw.SetInputMode(
+                state.window.handle,
+                glfw.CURSOR,
+                glfw.CURSOR_DISABLED
+            )
+        } else {
+            glfw.SetInputMode(
+                state.window.handle,
+                glfw.CURSOR,
+                glfw.CURSOR_NORMAL
+            )
+        }
+    }
+
     update_camera_position_direction()
     camera.flycam_update_position(&state.flycam, state.move_direction, frame_duration)
 
@@ -219,13 +240,13 @@ frame_flush :: proc() -> bool {
 
     if window.cursor.dirty {
         cursor_update()
-        camera.flycam_update_direction(
-            &state.flycam,
-            window.cursor.dx,
-            window.cursor.dy
-        )
-
-        log.info(window.cursor)
+        if window.cursor.locked {
+            camera.flycam_update_direction(
+                &state.flycam,
+                window.cursor.dx,
+                window.cursor.dy
+            )
+        }
 
         window.cursor.dirty = false
     }
@@ -269,7 +290,7 @@ frame :: proc() {
 
         mvp := vp * model
 
-        gl.UniformMatrix4fv(gl.GetUniformLocation(quad.program.id, "mvp"), 1, false, &mvp[0][0])
+        gl.UniformMatrix4fv(quad.program.uniforms["mvp"], 1, false, &mvp[0][0])
 
         gfx.triangle_mesh_draw(&state.quad.mesh)
     }
@@ -345,11 +366,12 @@ window_init :: proc(width, height: i32, title: cstring) -> (ok: bool) {
     cursor_x, cursor_y := glfw.GetCursorPos(handle)
 
     cursor = {
-        x     = f32(cursor_x),
-        y     = f32(cursor_y),
-        dx    = 0,
-        dy    = 0,
-        dirty = false
+        x      = f32(cursor_x),
+        y      = f32(cursor_y),
+        dx     = 0,
+        dy     = 0,
+        dirty  = false,
+        locked = true
     }
     framebuffer_callback :: proc "c" (_win: glfw.WindowHandle, width, height: i32) {
         state.window.resolution = {
@@ -366,10 +388,14 @@ window_init :: proc(width, height: i32, title: cstring) -> (ok: bool) {
     keyboard_callback :: proc "c" (_win: glfw.WindowHandle, key, scancode, action, mods: i32) {
         state.keys[key] = action == glfw.PRESS
     }
+    mouse_btn_callback :: proc "c" (_win: glfw.WindowHandle, btn, action, mods: i32) {
+        state.mouse[btn] = action == glfw.PRESS
+    }
 
     glfw.SetFramebufferSizeCallback(handle, framebuffer_callback)
     glfw.SetCursorPosCallback(handle, cursor_move_callback)
     glfw.SetKeyCallback(handle, keyboard_callback)
+    glfw.SetMouseButtonCallback(handle, mouse_btn_callback)
 
     glfw.MakeContextCurrent(handle)
 
