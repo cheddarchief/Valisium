@@ -144,7 +144,7 @@ init :: proc() -> (ok: bool) {
 
         if ok = gfx.shader_program_load_from_path(
             &program,
-            "res/shaders/default.glsl"
+            "./res/shaders/default.glsl"
         ); !ok {
             return
         }
@@ -338,6 +338,9 @@ window_init :: proc(width, height: i32, title: cstring) -> (ok: bool) {
         height = height,
         dirty  = false,
     }
+
+    glfw.SetInputMode(handle, glfw.CURSOR, glfw.CURSOR_DISABLED)
+    glfw.PollEvents()
 
     cursor_x, cursor_y := glfw.GetCursorPos(handle)
 
