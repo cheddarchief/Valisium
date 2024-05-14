@@ -144,7 +144,7 @@ init :: proc() -> (ok: bool) {
 
         if ok = gfx.shader_program_load_from_path(
             &program,
-            "w:\\Valisium\\res\\shaders\\default.glsl"
+            "res/shaders/default.glsl"
         ); !ok {
             return
         }
