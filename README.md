@@ -1,13 +1,5 @@
 # Valisium
 
-# Build Run instrcutions:
+Simple 3d "Game" (Not yet) engine written from scratch using modern OpenGL via LWJGL in java.
 
-Get Odin compiler at `https://odin-lang.org/docs/install/`
-
-To build the executable you have to:
-
-```sh
-odin run src -o:speed -debug
-```
-
-without debug it's not compiling yet
+To run it you need to link (opengl, glfw, memoryutil) lwjgl + joml + imgui-java. For now the it's not buildable from source without some setting up.
